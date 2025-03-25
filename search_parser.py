@@ -39,15 +39,32 @@ class WildberriesParser:
         parsed_data = []
         
         for product in products:
-            price_info = product.get('priceU', {})
-            sale_price = product.get('salePriceU', price_info)
+            # Extract price information from sizes array
+            basic_price = None
+            sale_price = None
+            
+            if 'sizes' in product and len(product['sizes']) > 0:
+                size_info = product['sizes'][0]  # Take first size option
+                if 'price' in size_info:
+                    price_info = size_info['price']
+                    basic_price = price_info.get('basic', None)
+                    sale_price = price_info.get('product', basic_price)
+            
+            # Convert prices from cents to rubles if they exist
+            basic_price = int(basic_price / 100) if basic_price else None
+            sale_price = int(sale_price / 100) if sale_price else None
+            
+            # Calculate discount percentage if both prices exist
+            discount_percent = 0
+            if basic_price and sale_price and basic_price > 0:
+                discount_percent = round((1 - (sale_price / basic_price)) * 100, 1)
             
             parsed_data.append({
                 'id': product.get('id'),
                 'name': product.get('name'),
-                'price': int(price_info / 100) if price_info else None,
-                'salePriceU': int(sale_price / 100) if sale_price else None,
-                'sale': round((1 - (sale_price / price_info)) * 100, 1) if price_info and sale_price else 0,
+                'price': basic_price,
+                'salePrice': sale_price,
+                'discountPercent': discount_percent,
                 'brand': product.get('brand'),
                 'rating': product.get('rating'),
                 'supplier': product.get('supplier'),
@@ -82,7 +99,8 @@ class WildberriesParser:
                     break
                 
                 data_list.extend(self.parse_products(products))
-            except Exception:
+            except Exception as e:
+                print(f"Error on page {page}: {str(e)}")
                 continue
         
         if data_list:
